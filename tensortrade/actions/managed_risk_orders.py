@@ -113,7 +113,7 @@ class ManagedRiskOrders(ActionScheme):
         size = (wallet.balance.size * size)
         size = min(wallet.balance.size, size)
 
-        if size < 10 ** -pair.base.precision:
+        if size < 10 ** -wallet_instrument.precision:
             return None
 
         params = {

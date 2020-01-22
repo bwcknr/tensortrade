@@ -46,13 +46,10 @@ class DynamicOrders(ActionScheme):
         self._trade_type = self.default('trade_type', trade_type)
         self._order_listener = self.default('order_listener', order_listener)
 
-        actions = [None]
-
-        for criteria, size in product(self._criteria, self._trade_sizes):
-            actions += [(TradeSide.BUY, criteria, size)]
-            actions += [(TradeSide.SELL, criteria, size)]
-
-        self.actions = actions
+        generator = product(self._criteria,
+                            self._trade_sizes,
+                            [TradeSide.BUY, TradeSide.SELL])
+        self.actions = list(generator)
 
     @property
     def action_space(self) -> Discrete:
@@ -86,17 +83,20 @@ class DynamicOrders(ActionScheme):
         if action == 0:
             return None
 
-        ((exchange, pair), (side, criteria, size)) = self.actions[action]
+        ((exchange, pair), (criteria, size, side)) = self.actions[action]
 
-        instrument = side.instrument(pair)
-        wallet = portfolio.get_wallet(exchange.id, instrument=instrument)
-        price = exchange.quote_price(instrument)
+        price = exchange.quote_price(pair)
+
+        wallet_instrument = side.instrument(pair)
+        wallet = portfolio.get_wallet(exchange.id, instrument=wallet_instrument)
+
+        size = (wallet.balance.size * size)
         size = min(wallet.balance.size, (wallet.balance.size * size))
 
-        if size < 10 ** -instrument.precision:
+        if size < 10 ** -wallet_instrument.precision:
             return None
 
-        quantity = size * instrument
+        quantity = size * wallet_instrument
 
         order = Order(step=exchange.clock.step,
                       side=side,
